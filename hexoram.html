@@ -2,616 +2,653 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Neon Asteroid Hunter</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSRF Recon & Planning Workbench</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
-
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        
         body {
-            margin: 0;
-            padding: 0;
-            background-color: #050505;
-            overflow: hidden; /* Prevent scrolling */
-            font-family: 'Orbitron', sans-serif;
-            touch-action: none; /* Prevent browser zoom/swipe */
+            font-family: 'Inter', sans-serif;
+            background-color: #fafaf9; /* Stone-50 */
+            color: #1c1917; /* Stone-900 */
         }
 
-        #gameCanvas {
-            display: block;
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #e7e5e4; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #a8a29e; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #78716c; 
         }
 
-        /* UI Overlays */
-        .ui-layer {
-            position: absolute;
-            top: 0;
-            left: 0;
+        /* Chart Container Strict Styling */
+        .chart-container {
+            position: relative;
             width: 100%;
-            height: 100%;
-            pointer-events: none; /* Let clicks pass through to canvas/buttons */
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
+            max-width: 100%;
+            height: 300px;
+            margin: 0 auto;
+        }
+        
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
         }
 
-        #scoreBoard {
-            padding: 20px;
-            color: #00ffcc;
-            font-size: 24px;
-            text-shadow: 0 0 10px #00ffcc;
-            z-index: 10;
+        .nav-item.active {
+            background-color: #e7e5e4;
+            border-left: 4px solid #ea580c; /* Orange-600 */
+            font-weight: 600;
         }
 
-        #startScreen, #gameOverScreen {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.85);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            pointer-events: auto;
-            z-index: 20;
-            backdrop-filter: blur(5px);
+        .tab-btn.active {
+            border-bottom: 2px solid #ea580c;
+            color: #ea580c;
         }
 
-        h1 {
-            color: #fff;
-            font-size: 40px;
-            margin-bottom: 10px;
-            text-shadow: 0 0 20px #ff00de;
-            text-align: center;
-            text-transform: uppercase;
-            letter-spacing: 5px;
-        }
-
-        p {
-            color: #ccc;
-            font-size: 16px;
-            margin-bottom: 30px;
-            text-align: center;
-            line-height: 1.5;
-            max-width: 80%;
-        }
-
-        .btn {
-            background: transparent;
-            color: #00ffcc;
-            border: 2px solid #00ffcc;
-            padding: 15px 40px;
-            font-size: 20px;
-            font-family: 'Orbitron', sans-serif;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-transform: uppercase;
-            box-shadow: 0 0 15px rgba(0, 255, 204, 0.3);
-        }
-
-        .btn:hover {
-            background: #00ffcc;
-            color: #000;
-            box-shadow: 0 0 30px rgba(0, 255, 204, 0.8);
-        }
-
-        .hidden {
-            display: none !important;
-        }
-
-        /* Mobile Controls */
-        #mobileControls {
-            position: absolute;
-            bottom: 20px;
-            left: 0;
-            width: 100%;
-            height: 150px;
-            pointer-events: none;
-            display: none; /* Hidden by default, shown via JS on touch devices */
-            padding: 0 20px;
-            box-sizing: border-box;
-            z-index: 15;
-        }
-
-        .control-group {
-            position: absolute;
-            bottom: 10px;
-            pointer-events: auto;
-        }
-
-        .left-controls {
-            left: 20px;
-            display: flex;
-            gap: 15px;
-        }
-
-        .right-controls {
-            right: 20px;
-            display: flex;
-            gap: 20px;
-            align-items: flex-end;
-        }
-
-        .touch-btn {
-            width: 60px;
-            height: 60px;
+        /* Loading Spinner */
+        .loader {
+            border: 3px solid #f3f3f3;
             border-radius: 50%;
-            background: rgba(255, 255, 255, 0.1);
-            border: 2px solid rgba(0, 255, 204, 0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 24px;
-            user-select: none;
-            -webkit-user-select: none;
-            touch-action: manipulation;
+            border-top: 3px solid #ea580c;
+            width: 20px;
+            height: 20px;
+            -webkit-animation: spin 1s linear infinite; /* Safari */
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
 
-        .touch-btn:active {
-            background: rgba(0, 255, 204, 0.3);
-            transform: scale(0.95);
+        /* Utility for transitions */
+        .transition-all-300 {
+            transition: all 0.3s ease-in-out;
         }
-
-        .touch-btn.shoot-btn {
-            width: 80px;
-            height: 80px;
-            border-color: #ff0055;
-            background: rgba(255, 0, 85, 0.1);
-        }
-        
-        .touch-btn.shoot-btn:active {
-            background: rgba(255, 0, 85, 0.3);
-        }
-
     </style>
+    <!-- Chosen Palette: Warm Neutrals (Stone) with Burnt Orange Accents. Minimalistic, professional, and data-focused. -->
+    <!-- Application Structure Plan: 
+         1. Dashboard Overview: High-level metrics on SSRF entry points and impact to set context.
+         2. Payload Constructor: Interactive tool to generate specific SSRF test strings based on cloud provider/scenario.
+         3. AI Operations: Gemini-powered tools for report drafting and advanced payload brainstorming.
+         4. Methodology Guide: A tabbed interface guiding the user through Discovery, Blind SSRF, and Bypassing filters.
+         5. Defense Analyst: A section for mitigation strategies, vital for writing high-quality reports.
+    -->
+    <!-- Visualization & Content Choices:
+         1. Bar Chart (Entry Points): Shows frequency of vulnerability locations.
+         2. Doughnut Chart (Impact): Shows severity distribution.
+         3. Interactive Inputs (Payloads/AI): Dropdowns, text areas, and Gemini API integration.
+         4. Tabs (Methodology): Segments complex workflows.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
 </head>
-<body>
+<body class="flex flex-col md:flex-row min-h-screen">
 
-    <canvas id="gameCanvas"></canvas>
-
-    <!-- UI Overlay -->
-    <div class="ui-layer">
-        <div id="scoreBoard">SCORE: 0</div>
-        
-        <!-- Mobile Controls Container -->
-        <div id="mobileControls">
-            <div class="control-group left-controls">
-                <div class="touch-btn" id="btnLeft">←</div>
-                <div class="touch-btn" id="btnRight">→</div>
-            </div>
-            <div class="control-group right-controls">
-                <div class="touch-btn" id="btnThrust">▲</div>
-                <div class="touch-btn shoot-btn" id="btnShoot">◎</div>
+    <!-- Sidebar Navigation -->
+    <aside class="w-full md:w-64 bg-stone-100 border-r border-stone-200 flex-shrink-0 sticky top-0 md:h-screen overflow-y-auto z-20">
+        <div class="p-6 border-b border-stone-200">
+            <h1 class="text-xl font-bold text-stone-800 tracking-tight">SSRF<span class="text-orange-600">.Hunter</span></h1>
+            <p class="text-xs text-stone-500 mt-1">Recon & Analysis Workbench</p>
+        </div>
+        <nav class="mt-4">
+            <ul>
+                <li><button onclick="navigateTo('dashboard')" id="nav-dashboard" class="nav-item w-full text-left px-6 py-3 text-stone-600 hover:bg-stone-200 transition-colors active">📊 Dashboard Overview</button></li>
+                <li><button onclick="navigateTo('payloads')" id="nav-payloads" class="nav-item w-full text-left px-6 py-3 text-stone-600 hover:bg-stone-200 transition-colors">🛠️ Payload Constructor</button></li>
+                <li><button onclick="navigateTo('ai-ops')" id="nav-ai-ops" class="nav-item w-full text-left px-6 py-3 text-stone-800 hover:bg-orange-50 transition-colors font-medium border-l-4 border-transparent hover:border-orange-300">✨ AI Operations</button></li>
+                <li><button onclick="navigateTo('methodology')" id="nav-methodology" class="nav-item w-full text-left px-6 py-3 text-stone-600 hover:bg-stone-200 transition-colors">🔍 Methodology & Discovery</button></li>
+                <li><button onclick="navigateTo('mitigation')" id="nav-mitigation" class="nav-item w-full text-left px-6 py-3 text-stone-600 hover:bg-stone-200 transition-colors">🛡️ Mitigation Strategies</button></li>
+            </ul>
+        </nav>
+        <div class="p-6 mt-auto">
+            <div class="bg-orange-50 border border-orange-100 p-3 rounded-lg">
+                <h4 class="text-xs font-bold text-orange-800 uppercase mb-1">Current Target</h4>
+                <input type="text" placeholder="e.g., target-api.com" class="w-full bg-white border border-orange-200 rounded px-2 py-1 text-xs focus:outline-none focus:border-orange-500">
             </div>
         </div>
-    </div>
+    </aside>
 
-    <!-- Start Screen -->
-    <div id="startScreen">
-        <h1>Neon Void</h1>
-        <p>Destroy asteroids to survive.<br>
-           Desktop: Arrow Keys to Move, Space to Shoot.<br>
-           Mobile: Use on-screen controls.</p>
-        <button class="btn" onclick="startGame()">Initialize Ship</button>
-    </div>
+    <!-- Main Content Area -->
+    <main class="flex-1 overflow-y-auto p-4 md:p-8 bg-stone-50">
+        
+        <!-- Section: Dashboard Overview -->
+        <section id="dashboard" class="space-y-6">
+            <div class="mb-8">
+                <h2 class="text-2xl font-bold text-stone-800">SSRF Landscape Analysis</h2>
+                <p class="text-stone-600 mt-2 max-w-3xl">
+                    Server-Side Request Forgery (SSRF) remains a critical vulnerability in modern cloud-native applications. 
+                    This dashboard synthesizes key data points regarding entry vectors and impact severity to help prioritize your hunting efforts.
+                </p>
+            </div>
 
-    <!-- Game Over Screen -->
-    <div id="gameOverScreen" class="hidden">
-        <h1>Mission Failed</h1>
-        <p id="finalScore">Final Score: 0</p>
-        <button class="btn" onclick="startGame()">Re-Deploy</button>
-    </div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Card 1: Entry Points Chart -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-stone-200">
+                    <h3 class="text-lg font-semibold text-stone-800 mb-4">Most Common Injection Vectors</h3>
+                    <div class="chart-container">
+                        <canvas id="entryPointsChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Card 2: Impact Analysis -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-stone-200">
+                    <h3 class="text-lg font-semibold text-stone-800 mb-4">Potential Impact Severity</h3>
+                    <div class="chart-container">
+                        <canvas id="impactChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Stats Row -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-stone-800 text-white p-5 rounded-lg shadow-sm">
+                    <div class="text-2xl font-bold">169.254.x.x</div>
+                    <div class="text-sm text-stone-400 mt-1">Cloud Metadata Target</div>
+                </div>
+                <div class="bg-stone-100 text-stone-800 p-5 rounded-lg border border-stone-200">
+                    <div class="text-2xl font-bold">Blind SSRF</div>
+                    <div class="text-sm text-stone-500 mt-1">Requires OOB Interaction</div>
+                </div>
+                <div class="bg-stone-100 text-stone-800 p-5 rounded-lg border border-stone-200">
+                    <div class="text-2xl font-bold">PDF & Images</div>
+                    <div class="text-sm text-stone-500 mt-1">High-Risk Features</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section: Payload Constructor -->
+        <section id="payloads" class="hidden space-y-6">
+            <div class="mb-8">
+                <h2 class="text-2xl font-bold text-stone-800">Payload Constructor</h2>
+                <p class="text-stone-600 mt-2 max-w-3xl">
+                    Generate context-specific test strings for identifying SSRF. Select your target environment and obfuscation technique below.
+                </p>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden">
+                <div class="grid grid-cols-1 md:grid-cols-3 border-b border-stone-200">
+                    <div class="p-6 border-r border-stone-200 bg-stone-50">
+                        <label class="block text-xs font-bold text-stone-500 uppercase mb-2">Target Environment</label>
+                        <select id="targetEnv" class="w-full bg-white border border-stone-300 rounded p-2 text-sm focus:outline-none focus:border-orange-500 mb-4">
+                            <option value="basic">Basic Localhost (127.0.0.1)</option>
+                            <option value="aws">AWS Metadata (EC2)</option>
+                            <option value="gcp">Google Cloud Metadata</option>
+                            <option value="azure">Azure Instance Metadata</option>
+                            <option value="oracle">Oracle Cloud</option>
+                            <option value="docker">Docker API</option>
+                        </select>
+
+                        <label class="block text-xs font-bold text-stone-500 uppercase mb-2">Evasion / Obfuscation</label>
+                        <select id="obfuscationType" class="w-full bg-white border border-stone-300 rounded p-2 text-sm focus:outline-none focus:border-orange-500">
+                            <option value="none">None (Plain)</option>
+                            <option value="decimal">Decimal IP</option>
+                            <option value="octal">Octal IP</option>
+                            <option value="hex">Hexadecimal IP</option>
+                            <option value="dottedhex">Dotted Hex</option>
+                            <option value="short">Short Hand (0)</option>
+                        </select>
+                        
+                        <button id="generateBtn" class="w-full mt-6 bg-stone-800 hover:bg-stone-900 text-white font-semibold py-2 px-4 rounded transition-colors text-sm">
+                            Generate Payloads
+                        </button>
+                    </div>
+
+                    <div class="col-span-2 p-6">
+                        <div class="flex justify-between items-center mb-2">
+                            <h4 class="font-semibold text-stone-700">Generated Reference Payloads</h4>
+                            <span class="text-xs text-stone-400">Read-only Output</span>
+                        </div>
+                        <textarea id="payloadOutput" readonly class="w-full h-64 bg-stone-900 text-green-400 font-mono text-sm p-4 rounded-lg focus:outline-none resize-none" placeholder="Select options and click Generate..."></textarea>
+                        <div class="mt-2 flex justify-end">
+                            <button onclick="copyPayloads()" class="text-xs text-stone-500 hover:text-orange-600 font-medium">📋 Copy to Clipboard</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section: AI Operations (New) -->
+        <section id="ai-ops" class="hidden space-y-6">
+            <div class="mb-8">
+                <h2 class="text-2xl font-bold text-stone-800 flex items-center gap-2">
+                    <span class="text-orange-600">✨</span> Gemini AI Operations
+                </h2>
+                <p class="text-stone-600 mt-2 max-w-3xl">
+                    Leverage Large Language Models to accelerate your bug bounty workflow. Draft professional reports instantly or brainstorm complex bypass payloads based on specific WAF behaviors.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- AI Feature 1: Report Drafter -->
+                <div class="bg-white rounded-xl shadow-sm border border-stone-200 flex flex-col">
+                    <div class="p-6 border-b border-stone-100 bg-stone-50 rounded-t-xl">
+                        <h3 class="text-lg font-bold text-stone-800">Report Drafter</h3>
+                        <p class="text-xs text-stone-500">Turn rough notes into a HackerOne-ready report.</p>
+                    </div>
+                    <div class="p-6 space-y-4 flex-1">
+                        <div>
+                            <label class="block text-xs font-bold text-stone-500 uppercase mb-1">Vulnerable Endpoint</label>
+                            <input type="text" id="ai-report-endpoint" placeholder="e.g. https://api.target.com/fetch?url=" class="w-full bg-white border border-stone-300 rounded p-2 text-sm focus:border-orange-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-stone-500 uppercase mb-1">Impact / Findings</label>
+                            <textarea id="ai-report-findings" class="w-full h-24 bg-white border border-stone-300 rounded p-2 text-sm focus:border-orange-500 focus:outline-none resize-none" placeholder="e.g. Accessed AWS metadata, retrieved IAM credentials. Blind interaction confirmed via Burp Collab."></textarea>
+                        </div>
+                        <button id="btn-draft-report" class="w-full bg-stone-800 hover:bg-orange-600 text-white font-semibold py-2 px-4 rounded transition-colors text-sm flex justify-center items-center gap-2">
+                            <span>✨ Draft Report</span>
+                            <div id="loader-report" class="loader hidden"></div>
+                        </button>
+                        
+                        <div class="mt-4">
+                            <label class="block text-xs font-bold text-stone-400 uppercase mb-1">Generated Draft</label>
+                            <textarea id="ai-report-output" readonly class="w-full h-48 bg-stone-50 border border-stone-200 rounded p-3 text-xs font-mono text-stone-700 resize-none focus:outline-none"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI Feature 2: Payload Brainstormer -->
+                <div class="bg-white rounded-xl shadow-sm border border-stone-200 flex flex-col">
+                    <div class="p-6 border-b border-stone-100 bg-stone-50 rounded-t-xl">
+                        <h3 class="text-lg font-bold text-stone-800">Smart Payload Brainstormer</h3>
+                        <p class="text-xs text-stone-500">Describe the defense/stack, get custom bypass ideas.</p>
+                    </div>
+                    <div class="p-6 space-y-4 flex-1">
+                        <div>
+                            <label class="block text-xs font-bold text-stone-500 uppercase mb-1">Scenario Description</label>
+                            <textarea id="ai-payload-desc" class="w-full h-32 bg-white border border-stone-300 rounded p-2 text-sm focus:border-orange-500 focus:outline-none resize-none" placeholder="e.g. Target is a Java Spring app. It blocks 'localhost', '127.0.0.1' and redirects. I need to access an internal service on port 8080."></textarea>
+                        </div>
+                        <button id="btn-brainstorm" class="w-full bg-stone-800 hover:bg-orange-600 text-white font-semibold py-2 px-4 rounded transition-colors text-sm flex justify-center items-center gap-2">
+                            <span>✨ Suggest Payloads</span>
+                            <div id="loader-payload" class="loader hidden"></div>
+                        </button>
+
+                        <div class="mt-4">
+                            <label class="block text-xs font-bold text-stone-400 uppercase mb-1">AI Suggestions</label>
+                            <div id="ai-payload-output" class="w-full h-48 bg-stone-900 border border-stone-700 rounded p-3 text-xs font-mono text-green-400 overflow-y-auto whitespace-pre-wrap"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section: Methodology -->
+        <section id="methodology" class="hidden space-y-6">
+            <div class="mb-6">
+                <h2 class="text-2xl font-bold text-stone-800">Testing Methodology</h2>
+                <p class="text-stone-600 mt-2 max-w-3xl">
+                    A structured approach is required to reliably detect SSRF without causing system instability. 
+                    Navigate through the phases below to understand the workflow from discovery to exploitation.
+                </p>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-stone-200">
+                <!-- Tabs Header -->
+                <div class="flex border-b border-stone-200 overflow-x-auto">
+                    <button onclick="switchTab('discovery')" class="tab-btn active px-6 py-4 text-sm font-medium text-stone-600 hover:text-stone-800 focus:outline-none whitespace-nowrap">1. Discovery & Recon</button>
+                    <button onclick="switchTab('testing')" class="tab-btn px-6 py-4 text-sm font-medium text-stone-600 hover:text-stone-800 focus:outline-none whitespace-nowrap">2. In-Band vs Blind</button>
+                    <button onclick="switchTab('bypass')" class="tab-btn px-6 py-4 text-sm font-medium text-stone-600 hover:text-stone-800 focus:outline-none whitespace-nowrap">3. Bypassing Filters</button>
+                </div>
+
+                <!-- Tab Content: Discovery -->
+                <div id="tab-discovery" class="p-6 md:p-8 animate-fade">
+                    <h3 class="text-lg font-bold text-stone-800 mb-4">Identifying Potential Entry Points</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div>
+                            <p class="text-stone-600 mb-4 text-sm leading-relaxed">
+                                SSRF usually occurs in functionality that imports data from a URL. Look for these specific features and parameter names during your manual browsing or crawling.
+                            </p>
+                            <ul class="space-y-3">
+                                <li class="flex items-center gap-3 bg-stone-50 p-3 rounded border border-stone-100">
+                                    <span class="text-orange-600 font-bold">01</span>
+                                    <span class="text-sm font-medium text-stone-700">Webhooks & Integrations</span>
+                                </li>
+                                <li class="flex items-center gap-3 bg-stone-50 p-3 rounded border border-stone-100">
+                                    <span class="text-orange-600 font-bold">02</span>
+                                    <span class="text-sm font-medium text-stone-700">File Upload via URL</span>
+                                </li>
+                                <li class="flex items-center gap-3 bg-stone-50 p-3 rounded border border-stone-100">
+                                    <span class="text-orange-600 font-bold">03</span>
+                                    <span class="text-sm font-medium text-stone-700">PDF/Image Generators</span>
+                                </li>
+                            </ul>
+                        </div>
+                        <div class="bg-stone-900 rounded-lg p-5 font-mono text-xs">
+                            <div class="text-stone-400 mb-2 border-b border-stone-700 pb-2"># Common Suspect Parameters</div>
+                            <div class="text-green-400 space-y-1">
+                                <div>?dest={url}</div>
+                                <div>?redirect={url}</div>
+                                <div>?uri={url}</div>
+                                <div>?path={url}</div>
+                                <div>?continue={url}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab Content: Testing -->
+                <div id="tab-testing" class="hidden p-6 md:p-8 animate-fade">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div>
+                            <h4 class="font-bold text-stone-800 mb-2">In-Band SSRF</h4>
+                            <p class="text-sm text-stone-600 mb-4">
+                                The application returns the response from the fetched URL directly to you.
+                            </p>
+                            <div class="bg-stone-100 p-4 rounded border-l-4 border-green-500">
+                                <p class="text-xs font-mono text-stone-700">
+                                    <strong>Request:</strong> POST /stock?api=http://localhost/admin<br>
+                                    <strong>Response:</strong> 200 OK "Welcome to Admin Panel"
+                                </p>
+                            </div>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-stone-800 mb-2">Blind SSRF</h4>
+                            <p class="text-sm text-stone-600 mb-4">
+                                The application fetches the URL but does not return the content. You must rely on out-of-band (OOB) interactions.
+                            </p>
+                            <div class="bg-stone-100 p-4 rounded border-l-4 border-orange-500">
+                                <p class="text-xs font-mono text-stone-700">
+                                    <strong>Request:</strong> POST /track?url=http://attacker-controlled.com<br>
+                                    <strong>Response:</strong> 200 OK "Tracking enabled"<br>
+                                    <strong>Attacker Log:</strong> [DNS Query] received.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab Content: Bypass -->
+                <div id="tab-bypass" class="hidden p-6 md:p-8 animate-fade">
+                    <h3 class="text-lg font-bold text-stone-800 mb-4">Filter Evasion Techniques</h3>
+                    <p class="text-stone-600 text-sm mb-6">Developers often blacklist "localhost". Here is how to bypass those filters.</p>
+                    
+                    <div class="space-y-4">
+                        <div class="flex flex-col sm:flex-row gap-4">
+                            <div class="flex-1 bg-white border border-stone-200 rounded p-4 hover:shadow-md transition-shadow">
+                                <h5 class="font-bold text-stone-800 text-sm">DNS Rebinding</h5>
+                                <p class="text-xs text-stone-500 mt-1">Configure a domain with a very short TTL. First resolution returns a public IP, second resolution returns 127.0.0.1.</p>
+                            </div>
+                            <div class="flex-1 bg-white border border-stone-200 rounded p-4 hover:shadow-md transition-shadow">
+                                <h5 class="font-bold text-stone-800 text-sm">Alternative Encodings</h5>
+                                <p class="text-xs text-stone-500 mt-1">Use Enclosed Alphanumerics (①②⑦.⓪.⓪.①) or mix hex/octal to confuse the regex parser.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section: Mitigation -->
+        <section id="mitigation" class="hidden space-y-6">
+            <div class="mb-8">
+                <h2 class="text-2xl font-bold text-stone-800">Remediation & Defense</h2>
+                <p class="text-stone-600 mt-2 max-w-3xl">
+                    Reporting an SSRF is not enough; providing actionable remediation advice increases the value of your report.
+                </p>
+            </div>
+
+            <div class="space-y-4">
+                <div class="bg-white border border-stone-200 rounded-lg p-6">
+                    <div class="flex items-start gap-4">
+                        <div class="bg-green-100 text-green-700 p-2 rounded text-xl">🛡️</div>
+                        <div>
+                            <h3 class="font-bold text-stone-800 text-lg">Strict Allowlisting (Whitelisting)</h3>
+                            <p class="text-stone-600 text-sm mt-2">
+                                The most effective defense. Only allow the application to fetch from specific, pre-approved domains or IP ranges.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
 
     <script>
-        // --- Game Constants & Setup ---
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        const scoreEl = document.getElementById('scoreBoard');
-        const startScreen = document.getElementById('startScreen');
-        const gameOverScreen = document.getElementById('gameOverScreen');
-        const finalScoreEl = document.getElementById('finalScore');
-        const mobileControls = document.getElementById('mobileControls');
+        // --- Gemini API Logic ---
+        const apiKey = ""; // Runtime provided
 
-        // Detect Mobile
-        const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-        if (isMobile) {
-            mobileControls.style.display = 'block';
+        async function callGemini(prompt) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            
+            const payload = {
+                contents: [{ parts: [{ text: prompt }] }]
+            };
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) throw new Error(`API Error: ${response.status}`);
+                
+                const data = await response.json();
+                return data.candidates[0].content.parts[0].text;
+            } catch (error) {
+                console.error("Gemini API Error:", error);
+                // Fallback / Exponential Backoff mock (simplified for demo)
+                return "Error connecting to AI service. Please check console.";
+            }
         }
 
-        let animationId;
-        let score = 0;
-        let gameActive = false;
+        // --- AI UI Handlers ---
+        document.getElementById('btn-draft-report').addEventListener('click', async () => {
+            const endpoint = document.getElementById('ai-report-endpoint').value;
+            const findings = document.getElementById('ai-report-findings').value;
+            const output = document.getElementById('ai-report-output');
+            const loader = document.getElementById('loader-report');
 
-        // Input State
-        const keys = {
-            ArrowUp: false,
-            ArrowLeft: false,
-            ArrowRight: false,
-            Space: false
+            if(!endpoint || !findings) {
+                alert("Please fill in both endpoint and findings.");
+                return;
+            }
+
+            // UI State: Loading
+            loader.classList.remove('hidden');
+            output.value = "Drafting report with Gemini...";
+            
+            const prompt = `Act as a professional Bug Bounty Hunter. Draft a high-quality vulnerability report for an SSRF vulnerability.
+            Endpoint: ${endpoint}
+            Findings/Impact: ${findings}
+            
+            Format the report with these sections:
+            1. Title (Concise and descriptive)
+            2. Summary
+            3. Steps to Reproduce
+            4. Impact
+            5. Recommended Fix`;
+
+            try {
+                const result = await callGemini(prompt);
+                output.value = result;
+            } catch (e) {
+                output.value = "Failed to generate report.";
+            } finally {
+                loader.classList.add('hidden');
+            }
+        });
+
+        document.getElementById('btn-brainstorm').addEventListener('click', async () => {
+            const desc = document.getElementById('ai-payload-desc').value;
+            const output = document.getElementById('ai-payload-output');
+            const loader = document.getElementById('loader-payload');
+
+            if(!desc) {
+                alert("Please describe the scenario.");
+                return;
+            }
+
+            loader.classList.remove('hidden');
+            output.textContent = "Consulting AI for bypasses...";
+
+            const prompt = `I am a security researcher testing a system with permission. 
+            I need a list of 5 specific, technical SSRF payloads to bypass a WAF/Filter described as: "${desc}".
+            Provide ONLY the raw payloads and a 1-sentence explanation for each. Do not provide general advice.`;
+
+            try {
+                const result = await callGemini(prompt);
+                output.textContent = result;
+            } catch (e) {
+                output.textContent = "Failed to generate payloads.";
+            } finally {
+                loader.classList.add('hidden');
+            }
+        });
+
+
+        // --- State Management ---
+        const state = {
+            currentTab: 'discovery',
+            activeSection: 'dashboard',
+            payloads: {
+                aws: 'http://169.254.169.254/latest/meta-data/',
+                gcp: 'http://metadata.google.internal/computeMetadata/v1/',
+                azure: 'http://169.254.169.254/metadata/instance',
+                oracle: 'http://169.254.169.254/opc/v1/instance/',
+                docker: 'http://127.0.0.1:2375/v1.24/containers/json',
+                basic: 'http://127.0.0.1:80'
+            }
         };
 
-        // Resize Handling
-        function resize() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
-        window.addEventListener('resize', resize);
-        resize();
+        // --- Navigation Logic ---
+        function navigateTo(sectionId) {
+            // Update UI State
+            document.querySelectorAll('section').forEach(sec => sec.classList.add('hidden'));
+            document.getElementById(sectionId).classList.remove('hidden');
+            
+            // Update Sidebar Active State
+            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+            document.getElementById(`nav-${sectionId}`).classList.add('active');
+            
+            state.activeSection = sectionId;
 
-        // --- Classes ---
-
-        class Ship {
-            constructor() {
-                this.x = canvas.width / 2;
-                this.y = canvas.height / 2;
-                this.r = 15; // Radius
-                this.a = -Math.PI / 2; // Angle (pointing up)
-                this.rot = 0; // Rotation speed
-                this.thrusting = false;
-                this.vel = { x: 0, y: 0 };
-                this.friction = 0.99; // Space friction
-                this.turnSpeed = 0.08;
-                this.thrustPower = 0.15;
-                this.blinkTime = 0;
-                this.invulnerable = 120; // Frames of invulnerability on start
-            }
-
-            update() {
-                // Rotation
-                if (keys.ArrowLeft) this.rot = -this.turnSpeed;
-                else if (keys.ArrowRight) this.rot = this.turnSpeed;
-                else this.rot = 0;
-
-                this.a += this.rot;
-
-                // Thrust
-                this.thrusting = keys.ArrowUp;
-                if (this.thrusting) {
-                    this.vel.x += Math.cos(this.a) * this.thrustPower;
-                    this.vel.y += Math.sin(this.a) * this.thrustPower;
-                    
-                    // FX: Add thrust particles
-                    if (Math.random() > 0.5) {
-                        particles.push(new Particle(
-                            this.x - Math.cos(this.a) * this.r,
-                            this.y - Math.sin(this.a) * this.r,
-                            (Math.random() - 0.5) * 2,
-                            (Math.random() - 0.5) * 2,
-                            '#ff00de'
-                        ));
-                    }
-                }
-
-                // Physics
-                this.x += this.vel.x;
-                this.y += this.vel.y;
-                this.vel.x *= this.friction;
-                this.vel.y *= this.friction;
-
-                // Screen Wrapping
-                if (this.x < 0 - this.r) this.x = canvas.width + this.r;
-                else if (this.x > canvas.width + this.r) this.x = 0 - this.r;
-                if (this.y < 0 - this.r) this.y = canvas.height + this.r;
-                else if (this.y > canvas.height + this.r) this.y = 0 - this.r;
-
-                // Invulnerability
-                if (this.invulnerable > 0) this.invulnerable--;
-            }
-
-            draw() {
-                // Blink if invulnerable
-                if (this.invulnerable > 0 && Math.floor(Date.now() / 100) % 2 === 0) return;
-
-                ctx.strokeStyle = '#00ffcc';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                // Nose
-                ctx.moveTo(
-                    this.x + 4/3 * this.r * Math.cos(this.a),
-                    this.y + 4/3 * this.r * Math.sin(this.a)
-                );
-                // Rear Left
-                ctx.lineTo(
-                    this.x - this.r * (2/3 * Math.cos(this.a) + Math.sin(this.a)),
-                    this.y - this.r * (2/3 * Math.sin(this.a) - Math.cos(this.a))
-                );
-                // Rear Center (indent)
-                ctx.lineTo(
-                    this.x - this.r * 1/3 * Math.cos(this.a),
-                    this.y - this.r * 1/3 * Math.sin(this.a)
-                );
-                // Rear Right
-                ctx.lineTo(
-                    this.x - this.r * (2/3 * Math.cos(this.a) - Math.sin(this.a)),
-                    this.y - this.r * (2/3 * Math.sin(this.a) + Math.cos(this.a))
-                );
-                ctx.closePath();
-                ctx.stroke();
-
-                // Thrust flame
-                if (this.thrusting) {
-                    ctx.strokeStyle = '#ff0055';
-                    ctx.beginPath();
-                    ctx.moveTo(
-                        this.x - this.r * 0.5 * Math.cos(this.a),
-                        this.y - this.r * 0.5 * Math.sin(this.a)
-                    );
-                    ctx.lineTo(
-                        this.x - this.r * (Math.random() + 1.5) * Math.cos(this.a),
-                        this.y - this.r * (Math.random() + 1.5) * Math.sin(this.a)
-                    );
-                    ctx.stroke();
-                }
+            // Resize charts if dashboard is revisited (Chart.js quirk fix)
+            if(sectionId === 'dashboard') {
+                window.dispatchEvent(new Event('resize'));
             }
         }
 
-        class Asteroid {
-            constructor(x, y, r) {
-                this.x = x || Math.random() * canvas.width;
-                this.y = y || Math.random() * canvas.height;
-                // If initializing without coords, keep away from center (player spawn)
-                if (x === undefined) {
-                    while(dist(this.x, this.y, canvas.width/2, canvas.height/2) < 200) {
-                        this.x = Math.random() * canvas.width;
-                        this.y = Math.random() * canvas.height;
-                    }
-                }
-
-                this.r = r || 50; // Radius
-                this.vel = {
-                    x: (Math.random() - 0.5) * (100 / this.r), // Smaller = faster
-                    y: (Math.random() - 0.5) * (100 / this.r)
-                };
-                this.vert = Math.floor(Math.random() * 5 + 7); // Vertices count
-                this.offsets = [];
-                for (let i = 0; i < this.vert; i++) {
-                    this.offsets.push(Math.random() * 0.4 + 0.8); // Random jaggedness
-                }
-                this.angle = Math.random() * Math.PI * 2;
-            }
-
-            update() {
-                this.x += this.vel.x;
-                this.y += this.vel.y;
-
-                if (this.x < 0 - this.r) this.x = canvas.width + this.r;
-                else if (this.x > canvas.width + this.r) this.x = 0 - this.r;
-                if (this.y < 0 - this.r) this.y = canvas.height + this.r;
-                else if (this.y > canvas.height + this.r) this.y = 0 - this.r;
-            }
-
-            draw() {
-                ctx.strokeStyle = '#fff';
-                ctx.lineWidth = 1.5;
-                ctx.beginPath();
-                for (let i = 0; i < this.vert; i++) {
-                    const angle = (Math.PI * 2 / this.vert) * i + this.angle;
-                    const r = this.r * this.offsets[i];
-                    const px = this.x + r * Math.cos(angle);
-                    const py = this.y + r * Math.sin(angle);
-                    if (i === 0) ctx.moveTo(px, py);
-                    else ctx.lineTo(px, py);
-                }
-                ctx.closePath();
-                ctx.stroke();
-            }
-
-            break() {
-                // Spawn smaller asteroids
-                if (this.r > 25) {
-                    const num = 2;
-                    for (let i = 0; i < num; i++) {
-                        asteroids.push(new Asteroid(this.x, this.y, this.r / 2));
-                    }
-                }
-                // Spawn dust particles
-                for(let i=0; i<10; i++) {
-                    particles.push(new Particle(this.x, this.y, (Math.random()-0.5)*5, (Math.random()-0.5)*5, '#fff'));
-                }
-            }
+        // --- Tab Logic ---
+        function switchTab(tabId) {
+            document.getElementById('tab-discovery').classList.add('hidden');
+            document.getElementById('tab-testing').classList.add('hidden');
+            document.getElementById('tab-bypass').classList.add('hidden');
+            
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+            
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            state.currentTab = tabId;
         }
 
-        class Bullet {
-            constructor(x, y, a) {
-                this.x = x;
-                this.y = y;
-                this.vel = {
-                    x: Math.cos(a) * 7,
-                    y: Math.sin(a) * 7
-                };
-                this.life = 60; // Frames to live
-            }
+        // --- Chart Initialization ---
+        document.addEventListener('DOMContentLoaded', () => {
+            initEntryPointsChart();
+            initImpactChart();
+            setupPayloadGenerator();
+        });
 
-            update() {
-                this.x += this.vel.x;
-                this.y += this.vel.y;
-                this.life--;
-
-                // Wrap (optional for bullets, but good for gameplay)
-                if (this.x < 0) this.x = canvas.width;
-                else if (this.x > canvas.width) this.x = 0;
-                if (this.y < 0) this.y = canvas.height;
-                else if (this.y > canvas.height) this.y = 0;
-            }
-
-            draw() {
-                ctx.fillStyle = '#ff00de';
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, 2, 0, Math.PI * 2);
-                ctx.fill();
-            }
-        }
-
-        class Particle {
-            constructor(x, y, vx, vy, color) {
-                this.x = x;
-                this.y = y;
-                this.vel = { x: vx, y: vy };
-                this.color = color;
-                this.life = 1.0;
-                this.decay = Math.random() * 0.03 + 0.01;
-            }
-
-            update() {
-                this.x += this.vel.x;
-                this.y += this.vel.y;
-                this.life -= this.decay;
-            }
-
-            draw() {
-                ctx.globalAlpha = this.life;
-                ctx.fillStyle = this.color;
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, 2, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.globalAlpha = 1.0;
-            }
-        }
-
-        // --- Game State Variables ---
-        let ship;
-        let asteroids = [];
-        let bullets = [];
-        let particles = [];
-        let level = 1;
-
-        // --- Core Functions ---
-
-        function dist(x1, y1, x2, y2) {
-            return Math.sqrt((x2-x1)**2 + (y2-y1)**2);
-        }
-
-        function createLevel() {
-            asteroids = [];
-            const count = 3 + level;
-            for (let i = 0; i < count; i++) {
-                asteroids.push(new Asteroid());
-            }
-        }
-
-        function spawnBullet() {
-            if (!ship) return;
-            bullets.push(new Bullet(
-                ship.x + Math.cos(ship.a) * ship.r,
-                ship.y + Math.sin(ship.a) * ship.r,
-                ship.a
-            ));
-        }
-
-        function checkCollisions() {
-            // Bullet vs Asteroid
-            for (let i = bullets.length - 1; i >= 0; i--) {
-                for (let j = asteroids.length - 1; j >= 0; j--) {
-                    let b = bullets[i];
-                    let a = asteroids[j];
-                    if (dist(b.x, b.y, a.x, a.y) < a.r) {
-                        // Hit
-                        a.break();
-                        score += Math.floor(1000 / a.r); // More points for smaller asteroids
-                        scoreEl.textContent = "SCORE: " + score;
-                        asteroids.splice(j, 1);
-                        bullets.splice(i, 1);
-                        break; // Bullet used up
-                    }
+        function initEntryPointsChart() {
+            const ctx = document.getElementById('entryPointsChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Webhook Config', 'Image/File Upload', 'PDF Generator', 'Proxy/Scraper', 'Link Preview', 'API Import'],
+                    datasets: [{
+                        label: 'Frequency',
+                        data: [25, 20, 15, 15, 15, 10],
+                        backgroundColor: 'rgba(234, 88, 12, 0.7)',
+                        borderColor: 'rgba(234, 88, 12, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, max: 30 } }
                 }
-            }
-
-            // Ship vs Asteroid
-            if (ship.invulnerable <= 0) {
-                for (let a of asteroids) {
-                    if (dist(ship.x, ship.y, a.x, a.y) < ship.r + a.r * 0.8) {
-                        endGame();
-                        break;
-                    }
-                }
-            }
-        }
-
-        function update() {
-            ship.update();
-
-            bullets.forEach((b, i) => {
-                b.update();
-                if (b.life <= 0) bullets.splice(i, 1);
             });
+        }
 
-            asteroids.forEach(a => a.update());
-
-            particles.forEach((p, i) => {
-                p.update();
-                if (p.life <= 0) particles.splice(i, 1);
+        function initImpactChart() {
+            const ctx = document.getElementById('impactChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Internal Port Scan', 'Cloud Metadata (RCE)', 'Local File Read', 'Internal API Access'],
+                    datasets: [{
+                        data: [40, 15, 20, 25],
+                        backgroundColor: ['#d6d3d1', '#ea580c', '#f97316', '#78716c'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } }
+                }
             });
-
-            checkCollisions();
-
-            // Next Level Check
-            if (asteroids.length === 0) {
-                level++;
-                createLevel();
-            }
         }
 
-        function draw() {
-            // Clear background with slight trail effect (optional, strictly clear here for crispness)
-            ctx.fillStyle = '#050505';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        function setupPayloadGenerator() {
+            const generateBtn = document.getElementById('generateBtn');
+            const targetSelect = document.getElementById('targetEnv');
+            const obsSelect = document.getElementById('obfuscationType');
+            const output = document.getElementById('payloadOutput');
 
-            // Draw Grid (Retro effect)
-            ctx.strokeStyle = '#111';
-            ctx.lineWidth = 1;
-            const gridSize = 50;
-            ctx.beginPath();
-            for(let x=0; x<canvas.width; x+=gridSize) {
-                ctx.moveTo(x,0); ctx.lineTo(x,canvas.height);
-            }
-            for(let y=0; y<canvas.height; y+=gridSize) {
-                ctx.moveTo(0,y); ctx.lineTo(canvas.width,y);
-            }
-            ctx.stroke();
+            generateBtn.addEventListener('click', () => {
+                const target = targetSelect.value;
+                const obs = obsSelect.value;
+                let baseUrl = state.payloads[target];
+                let finalPayloads = [];
 
-            ship.draw();
-            bullets.forEach(b => b.draw());
-            asteroids.forEach(a => a.draw());
-            particles.forEach(p => p.draw());
+                let ip = '127.0.0.1';
+                if(target.includes('169.254')) ip = '169.254.169.254';
+
+                if (obs === 'none') {
+                    finalPayloads.push(baseUrl);
+                } else if (obs === 'decimal') {
+                    const decimalIP = ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet), 0) >>> 0;
+                    finalPayloads.push(baseUrl.replace(ip, decimalIP));
+                } else if (obs === 'octal') {
+                    const octalIP = ip.split('.').map(o => '0' + parseInt(o).toString(8)).join('.');
+                    finalPayloads.push(baseUrl.replace(ip, octalIP));
+                } else if (obs === 'hex') {
+                    const hexIP = '0x' + ip.split('.').map(o => parseInt(o).toString(16).padStart(2, '0')).join('');
+                    finalPayloads.push(baseUrl.replace(ip, hexIP));
+                } else if (obs === 'dottedhex') {
+                    const dHex = ip.split('.').map(o => '0x' + parseInt(o).toString(16)).join('.');
+                    finalPayloads.push(baseUrl.replace(ip, dHex));
+                } else if (obs === 'short') {
+                    if(target === 'basic') finalPayloads.push('http://0/');
+                    else finalPayloads.push('N/A for this target');
+                }
+
+                if (obs === 'none') {
+                    finalPayloads.push(`url=${baseUrl}`);
+                    finalPayloads.push(`request=${baseUrl}`);
+                }
+                output.value = finalPayloads.join('\n');
+            });
         }
 
-        function loop() {
-            if (!gameActive) return;
-            update();
-            draw();
-            animationId = requestAnimationFrame(loop);
+        function copyPayloads() {
+            const copyText = document.getElementById("payloadOutput");
+            copyText.select();
+            document.execCommand("copy");
+            alert("Payloads copied to clipboard!");
         }
-
-        function startGame() {
-            startScreen.classList.add('hidden');
-            gameOverScreen.classList.add('hidden');
-            
-            score = 0;
-            level = 1;
-            scoreEl.textContent = "SCORE: 0";
-            
-            ship = new Ship();
-            bullets = [];
-            particles = [];
-            
-            createLevel();
-            
-            gameActive = true;
-            loop();
-        }
-
-        function endGame() {
-            gameActive = false;
-            cancelAnimationFrame(animationId);
-            finalScoreEl.textContent = "Final Score: " + score;
-            gameOverScreen.classList.remove('hidden');
-            
-            // Explosion effect at ship location
-            for(let i=0; i<30; i++) {
-                particles.push(new Particle(ship.x, ship.y, (Math.random()-0.5)*10, (Math.random()-0.5)*10, '#ff0055'));
-            }
-            draw(); // Draw one last frame to show explosion
-        }
-
-        // ---
+    </script>
+</body>
+</html>
